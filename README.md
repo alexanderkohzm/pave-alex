@@ -1,0 +1,3 @@
+`temporalite start`
+
+`encore run`
