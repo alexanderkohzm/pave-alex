@@ -5,31 +5,15 @@ import (
     "fmt"
     "github.com/google/uuid"
     "go.temporal.io/sdk/client"
+    "pave-alex/bill"
     "pave-alex/bill/workflow"
     temporalClient "pave-alex/temporal"
 )
 
-
-type CreateBillRequest struct {
-    Currency string // "USD" or "GEL"
-}
-
-type BillResponse struct {
-    ID          string
-    Currency    string
-    Status      string
-    TotalAmount float64
-    Items       []workflow.LineItem
-}
-
-type AddLineItemRequest struct {
-    Description string
-    Amount      float64
-}
+// add a LIST bill API -> query by status, query by currency
 
 //encore:api public method=POST path=/bills 
-func CreateBill(ctx context.Context, req *CreateBillRequest) (*BillResponse, error) {
-
+func CreateBill(ctx context.Context, req *bill.CreateBillRequest) (*bill.BillResponse, error) {
 
 	if req.Currency != "USD" && req.Currency != "GEL" {
 		return nil, fmt.Errorf("Create Bill - invalid currency, must be either USD or GEL")
@@ -47,95 +31,81 @@ func CreateBill(ctx context.Context, req *CreateBillRequest) (*BillResponse, err
         return nil, err
     }
 
-	return &BillResponse{
+	return &bill.BillResponse{
         ID:       billID,
         Currency: req.Currency,
         Status:   "OPEN",
-        Items:    []workflow.LineItem{},
+        Items:    []bill.LineItem{},
     }, nil
 }
 
 // AddLineItem adds a line item to an existing bill
 //encore:api public method=POST path=/bills/:billID/items
-func AddLineItem(ctx context.Context, billID string, req *AddLineItemRequest) (*BillResponse, error) {
+func AddLineItem(ctx context.Context, billID string, req *bill.AddLineItemRequest) (*bill.BillResponse, error) {
+
+    // WHY do we add the prefix? 
     workflowID := "bill-" + billID
 
-    var bill workflow.Bill 
-    we, err := temporalClient.Client.QueryWorkflow(ctx, workflowID, "", "get-bill-details", &bill)
-    if err != nil {
-        return nil, fmt.Errorf("AddLineItem - could not query bill: %w", err)
-    }
-    err = we.Get(&bill)
-    if err != nil {
-        return nil, fmt.Errorf("AddLineItem - could not decode bill: %w", err)
+    item := bill.LineItem {
+        ID: uuid.New().String(),
+        Description: req.Description, 
+        Amount: req.Amount, 
     }
 
-    if bill.Status == "CLOSED" {
-        return nil, fmt.Errorf("cannot add line item: bill is already closed")
-    }
-
-    // Create line item
-    item := workflow.LineItem{
-        ID:          uuid.New().String(),
-        Description: req.Description,
-        Amount:      req.Amount,
-    }
+        // Call Temporal Update API (sync, gets result)
+    updateHandle, err := temporalClient.Client.UpdateWorkflow(ctx, client.UpdateWorkflowOptions{
+        WorkflowID: workflowID,
+        RunID:      "",
+        UpdateName: "add-line-item",
+        Args:       []interface{}{item},
+        WaitForStage: client.WorkflowUpdateStageAccepted, 
+    })
     
-    // Send signal to workflow
-    err = temporalClient.Client.SignalWorkflow(ctx, workflowID, "", "add-item-signal", item)
     if err != nil {
-        return nil, err
-    }
-    
-    // Query workflow for current state
-    we, err = temporalClient.Client.QueryWorkflow(ctx, workflowID, "", "get-bill-details", &bill)
-    if err != nil {
-        return nil, fmt.Errorf("AddLineItem - could not query bill after updating: %w", err)
+        return nil, fmt.Errorf("AddLineItem - failed to update workflow: %w", err) 
     }
 
-    err = we.Get(&bill)
+    var updatedBill bill.Bill 
+    err = updateHandle.Get(ctx, &updatedBill) 
     if err != nil {
-        return nil, fmt.Errorf("AddLineItem - could not decode bill: %w", err)
+        return nil, fmt.Errorf("AddLineItem - failed to get update result: %w", err) 
     }
-        
-    return convertToResponse(bill), nil
+
+    return convertToResponse(updatedBill), nil 
 }
 
 // CloseBill closes an open bill
 //encore:api public method=POST path=/bills/:billID/close
-func CloseBill(ctx context.Context, billID string) (*BillResponse, error) {
+func CloseBill(ctx context.Context, billID string) (*bill.BillResponse, error) {
     workflowID := "bill-" + billID
-    
-    // Send close signal to workflow
-    err := temporalClient.Client.SignalWorkflow(ctx, workflowID, "", "close-bill-signal", nil)
+
+    updateHandle, err := temporalClient.Client.UpdateWorkflow(ctx, client.UpdateWorkflowOptions{
+        WorkflowID: workflowID, 
+        RunID: "", 
+        UpdateName: "close-bill",
+        WaitForStage: client.WorkflowUpdateStageAccepted, 
+    })
+
     if err != nil {
-        return nil, err
-    }
-    
-    // Query workflow for current state
-    var bill workflow.Bill
-    we, err := temporalClient.Client.QueryWorkflow(ctx, workflowID, "", "get-bill-details", &bill)
-    if err != nil {
-        return nil, err
+        return nil, fmt.Errorf("Close bill - failed to update workflow: %w", err)
     }
 
-    err = we.Get(&bill)
+    var updatedBill bill.Bill 
+    err = updateHandle.Get(ctx, &updatedBill) 
     if err != nil {
-        fmt.Println("Close Bill - error while getting closed bill detail:", err)
-        return nil, err
+        return nil, fmt.Errorf("Close Bill - failed to get update result: %w", err)
     }
-    
-    return convertToResponse(bill), nil
+    return convertToResponse(updatedBill), nil 
 }
 
 // GetBill gets a bill by ID
 //encore:api public method=GET path=/bills/:billID
-func GetBill(ctx context.Context, billID string) (*BillResponse, error) {
+func GetBill(ctx context.Context, billID string) (*bill.BillResponse, error) {
 
     workflowID := "bill-" + billID
 
     // Query workflow for current state
-    var bill workflow.Bill
+    var bill bill.Bill
     we, err := temporalClient.Client.QueryWorkflow(ctx, workflowID, "", "get-bill-details", &bill)
     if err != nil {
         fmt.Println("Get Bill - Error querying workflow:", err)
@@ -155,12 +125,12 @@ func GetBill(ctx context.Context, billID string) (*BillResponse, error) {
 }
 
 // Helper function to convert workflow Bill to API response
-func convertToResponse(bill workflow.Bill) *BillResponse {
-    return &BillResponse{
-        ID:          bill.ID,
-        Currency:    bill.Currency,
-        Status:      bill.Status,
-        TotalAmount: bill.TotalAmount,
-        Items:       bill.Items,
+func convertToResponse(b bill.Bill) *bill.BillResponse {
+    return &bill.BillResponse{
+        ID:          b.ID,
+        Currency:    b.Currency,
+        Status:      b.Status,
+        TotalAmount: b.TotalAmount,
+        Items:       b.Items,
     }
 }
