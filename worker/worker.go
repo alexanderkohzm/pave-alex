@@ -4,8 +4,8 @@ import (
     "context"
     "encore.dev/rlog"
     "go.temporal.io/sdk/worker"
-    "encore.app/bill/workflow"
-    temporalClient "encore.app/temporal"
+    "pave-alex/bill/workflow"
+    temporalClient "pave-alex/temporal"
 )
 
 //encore:service

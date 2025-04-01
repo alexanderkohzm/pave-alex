@@ -32,7 +32,7 @@ func CreateBill(ctx context.Context, req *CreateBillRequest) (*BillResponse, err
 
 
 	if req.Currency != "USD" && req.Currency != "GEL" {
-		return nil, fmt.Errorf("invalid currency, must be either USD or GEL")
+		return nil, fmt.Errorf("Create Bill - invalid currency, must be either USD or GEL")
 	}
 
 	billID := uuid.New().String() 
@@ -59,7 +59,21 @@ func CreateBill(ctx context.Context, req *CreateBillRequest) (*BillResponse, err
 //encore:api public method=POST path=/bills/:billID/items
 func AddLineItem(ctx context.Context, billID string, req *AddLineItemRequest) (*BillResponse, error) {
     workflowID := "bill-" + billID
-    
+
+    var bill workflow.Bill 
+    we, err := temporalClient.Client.QueryWorkflow(ctx, workflowID, "", "get-bill-details", &bill)
+    if err != nil {
+        return nil, fmt.Errorf("AddLineItem - could not query bill: %w", err)
+    }
+    err = we.Get(&bill)
+    if err != nil {
+        return nil, fmt.Errorf("AddLineItem - could not decode bill: %w", err)
+    }
+
+    if bill.Status == "CLOSED" {
+        return nil, fmt.Errorf("cannot add line item: bill is already closed")
+    }
+
     // Create line item
     item := workflow.LineItem{
         ID:          uuid.New().String(),
@@ -68,26 +82,22 @@ func AddLineItem(ctx context.Context, billID string, req *AddLineItemRequest) (*
     }
     
     // Send signal to workflow
-    err := temporalClient.Client.SignalWorkflow(ctx, workflowID, "", "add-item-signal", item)
+    err = temporalClient.Client.SignalWorkflow(ctx, workflowID, "", "add-item-signal", item)
     if err != nil {
         return nil, err
     }
     
     // Query workflow for current state
-    var bill workflow.Bill
-    we, err := temporalClient.Client.QueryWorkflow(ctx, workflowID, "", "get-bill-details", &bill)
+    we, err = temporalClient.Client.QueryWorkflow(ctx, workflowID, "", "get-bill-details", &bill)
     if err != nil {
-        return nil, err
+        return nil, fmt.Errorf("AddLineItem - could not query bill after updating: %w", err)
     }
 
     err = we.Get(&bill)
     if err != nil {
-        fmt.Println("[AddLineItem] Getting Bill Detail:", err)
-        return nil, err
+        return nil, fmt.Errorf("AddLineItem - could not decode bill: %w", err)
     }
-
-
-    
+        
     return convertToResponse(bill), nil
 }
 
@@ -104,8 +114,14 @@ func CloseBill(ctx context.Context, billID string) (*BillResponse, error) {
     
     // Query workflow for current state
     var bill workflow.Bill
-    _, err = temporalClient.Client.QueryWorkflow(ctx, workflowID, "", "get-bill-details", &bill)
+    we, err := temporalClient.Client.QueryWorkflow(ctx, workflowID, "", "get-bill-details", &bill)
     if err != nil {
+        return nil, err
+    }
+
+    err = we.Get(&bill)
+    if err != nil {
+        fmt.Println("Close Bill - error while getting closed bill detail:", err)
         return nil, err
     }
     
@@ -122,14 +138,14 @@ func GetBill(ctx context.Context, billID string) (*BillResponse, error) {
     var bill workflow.Bill
     we, err := temporalClient.Client.QueryWorkflow(ctx, workflowID, "", "get-bill-details", &bill)
     if err != nil {
-        fmt.Println("[GetBill] Error querying workflow:", err)
+        fmt.Println("Get Bill - Error querying workflow:", err)
         return nil, err
     }
 
     err = we.Get(&bill)
 
     if err != nil {
-        fmt.Println("[GetBill] Getting workflow:", err)
+        fmt.Println("Get Bill - Getting workflow error:", err)
         return nil, err
     }
 
