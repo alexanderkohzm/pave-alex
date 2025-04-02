@@ -3,6 +3,7 @@ package api
 import (
     "context"
     "fmt"
+    "log"
     "github.com/google/uuid"
     "go.temporal.io/sdk/client"
     "pave-alex/bill"
@@ -27,8 +28,10 @@ func CreateBill(ctx context.Context, req *bill.CreateBillRequest) (*bill.BillRes
 	}
 
 	_, err := temporalClient.Client.ExecuteWorkflow(ctx, workflowOptions, workflow.BillWorkflow, billID, req.Currency)
+
     if err != nil {
-        return nil, err
+        log.Printf("Failed to start bill workflow: %v", err)
+        return nil, fmt.Errorf("could not create bill at this time")
     }
 
 	return &bill.BillResponse{

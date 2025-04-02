@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"pave-alex/bill"
+	"pave-alex/bill/activities"
 	"fmt"
 	"go.temporal.io/sdk/workflow"
 )
@@ -21,17 +22,20 @@ func BillWorkflow(ctx workflow.Context, billID string, currency string) error {
 		CreatedAt: workflow.Now(ctx),
 	}
 
-	err := workflow.SetUpdateHandler(ctx, "add-line-item", func(ctx workflow.Context, item bill.LineItem)(bill.Bill, error) {
+	err := workflow.ExecuteActivity(ctx, activity.PersistBill, b).Get(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("Failed to persist initial bill state: %w", err)
+	}
+
+
+	err = workflow.SetUpdateHandler(ctx, "add-line-item", func(ctx workflow.Context, item bill.LineItem)(bill.Bill, error) {
 		if b.Status == "CLOSED" {
 			return b, fmt.Errorf("Cannot add line item, bill already closed")
 		}
-
 		// let's say we use activity to handle our bill data 
 		// what happens if you update it but it fails? 
 		// if it fails, then you will need to handle it. If it fails to save, we need
 		// to know exactly what to do. 
-		
-		// maybe  
 
 		b.Items = append(b.Items, item)
 		b.TotalAmount += item.Amount 
