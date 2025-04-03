@@ -1,11 +1,15 @@
-package workflow 
+package workflow
+
 // if a function is NOT capital case, then this function (AND TYPES) is available locally
-// if a function IS capitalized, then we can use it 
+// if a function IS capitalized, then we can use it
 
 import (
-	"pave-alex/bill"
-	"pave-alex/bill/activities"
+	"encore-app/bill/activities"
+	"encore-app/bill/models"
 	"fmt"
+	"time"
+
+	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -13,115 +17,134 @@ import (
 
 func BillWorkflow(ctx workflow.Context, billID string, currency string) error {
 
-	var b bill.Bill
-	b = bill.Bill {
-		ID: billID, 
-		Currency: currency,  // ENUM/CONSTANT 
-		Status: "OPEN", // ENUM/CONSTANT 
-		Items: []bill.LineItem{},
+	bill := models.Bill{
+		ID:        billID,
+		Currency:  currency, // ENUM/CONSTANT
+		Status:    "OPEN",   // ENUM/CONSTANT
+		Items:     []models.LineItem{},
 		CreatedAt: workflow.Now(ctx),
 	}
 
-	err := workflow.ExecuteActivity(ctx, activity.PersistBill, b).Get(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("Failed to persist initial bill state: %w", err)
+	activityOptions := workflow.ActivityOptions{
+		StartToCloseTimeout: time.Second * 10,
 	}
 
+	var billResult *models.Bill
 
-	err = workflow.SetUpdateHandler(ctx, "add-line-item", func(ctx workflow.Context, item bill.LineItem)(bill.Bill, error) {
-		if b.Status == "CLOSED" {
-			return b, fmt.Errorf("Cannot add line item, bill already closed")
-		}
-		// let's say we use activity to handle our bill data 
-		// what happens if you update it but it fails? 
-		// if it fails, then you will need to handle it. If it fails to save, we need
-		// to know exactly what to do. 
-
-		b.Items = append(b.Items, item)
-		b.TotalAmount += item.Amount 
-
-		// DB = the PERSISTED STATE
-		// This bill.items etc is the LIVE state
-		// We need to make sure that DB and the LIVE state are eventually consistent 
-		// e.g. this is why we would want to use upsert 
-
-		// can persist to DB here with Activity 
-		// workflow.ExecuteActivity(ctx, PersistBillToDB, bill)
-		return b, nil 
-	})
-
+	ctx = workflow.WithActivityOptions(ctx, activityOptions)
+	err := workflow.ExecuteActivity(ctx, activities.CreateBill, bill).Get(ctx, &billResult)
 	if err != nil {
-		return err 
+		return fmt.Errorf("failed to persist initial bill state: %w", err)
 	}
 
-	err = workflow.SetUpdateHandler(ctx, "close-bill", func(ctx workflow.Context)(bill.Bill, error) {
-		if b.Status == "CLOSED" {
-			return b, fmt.Errorf("Cannot close bill, bill already closed")
+	err = workflow.SetUpdateHandler(ctx, "add-line-item", func(ctx workflow.Context, item models.LineItem) (*models.Bill, error) {
+
+		if bill.Status == "CLOSED" {
+			return &bill, fmt.Errorf("cannot add line item, bill already closed")
 		}
-		b.Status = "CLOSED"
-		b.ClosedAt = workflow.Now(ctx)
-		return b, nil 
+		// Persist the state of the bill by upserting the line item
+		var updatedBill models.Bill
+
+		updateBillActivityOptions := workflow.ActivityOptions{
+			StartToCloseTimeout: time.Second * 10,
+			RetryPolicy: &temporal.RetryPolicy{
+				MaximumAttempts: 3},
+		}
+		updateBillCtx := workflow.WithActivityOptions(ctx, updateBillActivityOptions)
+		err := workflow.ExecuteActivity(updateBillCtx, activities.UpsertLineItem, &item).Get(ctx, &updatedBill)
+		if err != nil {
+			return &bill, fmt.Errorf("failed to upsert line item: %w", err)
+		}
+
+		// Update the live state in temporal
+		bill.Items = append(bill.Items, item)
+		bill.TotalAmount += item.Amount
+
+		// should perform some check to compare live state and persisted state
+		// if they are different, log the error
+		// Reflect Deep Equal is not a good idea because it will compare pointers
+		// potentially write a custom function to compare the two bills
+
+		return &bill, nil
 	})
+
 	if err != nil {
 		return err
 	}
 
-	// Register query handler for getting bill details 
-	err = workflow.SetQueryHandler(ctx, "get-bill-details", func() (bill.Bill, error) {
-		fmt.Println("Getting bill...", b)
-		return b, nil 
+	err = workflow.SetUpdateHandler(ctx, "close-bill", func(ctx workflow.Context) (models.Bill, error) {
+		if bill.Status == "CLOSED" {
+			return bill, fmt.Errorf("cannot close bill, bill already closed")
+		}
+
+		var closedBill models.Bill
+		closeBillActivityOptions := workflow.ActivityOptions{
+			StartToCloseTimeout: time.Second * 10,
+			RetryPolicy: &temporal.RetryPolicy{
+				MaximumAttempts: 3},
+		}
+		closeBillCtx := workflow.WithActivityOptions(ctx, closeBillActivityOptions)
+		err := workflow.ExecuteActivity(closeBillCtx, activities.CloseBill, bill.ID).Get(ctx, &closedBill)
+
+		if err != nil {
+			return bill, fmt.Errorf("failed to close bill: %w", err)
+		}
+
+		bill.Status = "CLOSED"
+		bill.ClosedAt = workflow.Now(ctx)
+		return bill, nil
 	})
 
 	if err != nil {
-		return err 
+		return err
 	}
 
 	err = workflow.Await(ctx, func() bool {
-		return b.Status == "CLOSED"
+		return bill.Status == "CLOSED"
 	})
 	if err != nil {
 		return err
 	}
 	return nil
 
-	for b.Status == "OPEN" {
-		selector := workflow.NewSelector(ctx) 
-		// select. add future -> by default, based on the input, it's just 30 days
-		// the bill can close by itself, but you can also early terminate it  
-			// 	selector.AddFuture(timerFuture, func(f workflow.Future) {
-			// 	if isEnded {
-			// 		return
-			// 	}
-			// 	workflow.GetLogger(ctx).Info("Billing period ended, closing the bill", "BillId", workflowInput.BillId)
+	// for bill.Status == "OPEN" {
+	// 	selector := workflow.NewSelector(ctx)
+	// 	// select. add future -> by default, based on the input, it's just 30 days
+	// 	// the bill can close by itself, but you can also early terminate it
+	// 	// 	selector.AddFuture(timerFuture, func(f workflow.Future) {
+	// 	// 	if isEnded {
+	// 	// 		return
+	// 	// 	}
+	// 	// 	workflow.GetLogger(ctx).Info("Billing period ended, closing the bill", "BillId", workflowInput.BillId)
 
-			// 	workflowID := workflow.GetInfo(ctx).WorkflowExecution.ID
-			// 	runID := workflow.GetInfo(ctx).WorkflowExecution.RunID
+	// 	// 	workflowID := workflow.GetInfo(ctx).WorkflowExecution.ID
+	// 	// 	runID := workflow.GetInfo(ctx).WorkflowExecution.RunID
 
-			// 	workflow.SignalExternalWorkflow(ctx, workflowID, runID, activity.CloseBillSignal, activity.CloseBillInput{BillId: workflowInput.BillId})
-			// 	isEnded = true
-			// })
+	// 	// 	workflow.SignalExternalWorkflow(ctx, workflowID, runID, activity.CloseBillSignal, activity.CloseBillInput{BillId: workflowInput.BillId})
+	// 	// 	isEnded = true
+	// 	// })
 
-		// selector.AddReceive(addItemChannel, func(c workflow.ReceiveChannel, more bool) {
-		// 	var item LineItem 
-		// 	c.Receive(ctx, &item) 
+	// 	// selector.AddReceive(addItemChannel, func(c workflow.ReceiveChannel, more bool) {
+	// 	// 	var item LineItem
+	// 	// 	c.Receive(ctx, &item)
 
-		// 	// Add items to bill 
-		// 	bill.Items = append(bill.Items, item) 
-		// 	bill.TotalAmount += item.Amount
-		// })
+	// 	// 	// Add items to bill
+	// 	// 	bill.Items = append(bill.Items, item)
+	// 	// 	bill.TotalAmount += item.Amount
+	// 	// })
 
-		// selector.AddReceive(closeBillChannel, func(c workflow.ReceiveChannel, more bool) {
-		// 	c.Receive(ctx, nil) 
-		// 	bill.Status = "CLOSED"
-		// 	bill.ClosedAt = workflow.Now(ctx)
-		// })
+	// 	// selector.AddReceive(closeBillChannel, func(c workflow.ReceiveChannel, more bool) {
+	// 	// 	c.Receive(ctx, nil)
+	// 	// 	bill.Status = "CLOSED"
+	// 	// 	bill.ClosedAt = workflow.Now(ctx)
+	// 	// })
 
-		selector.Select(ctx)
-	}
+	// 	selector.Select(ctx)
+	// }
 
-	// Should the bill end by itself? 
+	// Should the bill end by itself?
 	// for example, should it close in 30 days after it has been created?
-	// This shows how a workflow can make a long timer 
+	// This shows how a workflow can make a long timer
 
-	return nil
+	// return nil
 }

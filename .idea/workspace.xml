@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="c67c0092-50fe-407c-9bb2-28b68ce62ad7" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/bill/database/db.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/bill/database/migrations/1_first_migration.up.sql" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/bill/main.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/bill/models/bill.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/bill/models/currency.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/bill/models/line_item.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/bill/temporal/client.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/bill/workflow/activity.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/bill/activities/bill.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/bill/activities/line_items.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/bill/api/api.go" beforeDir="false" afterPath="$PROJECT_DIR$/bill/api/api.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/bill/db.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/bill/migrations/1_first_migration.up.sql" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/bill/workflow/bill_workflow.go" beforeDir="false" afterPath="$PROJECT_DIR$/bill/workflow/bill_workflow.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/encore.app" beforeDir="false" afterPath="$PROJECT_DIR$/encore.app" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/go.mod" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/go.sum" beforeDir="false" afterPath="$PROJECT_DIR$/go.sum" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/temporal/client.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/worker/worker.go" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 7
+}]]></component>
+  <component name="ProjectId" id="2vBNKrkEisQSyaddGLIILpVJIHo" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "test",
+    "last_opened_file_path": "/Users/alexanderkoh/code/pave-alex",
+    "nodejs_package_manager_path": "npm",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-deb605915726-JavaScript-PY-243.22562.220" />
+        <option value="bundled-python-sdk-0fc6c617c4bd-9a18a617cbe4-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-243.22562.220" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="c67c0092-50fe-407c-9bb2-28b68ce62ad7" name="Changes" comment="" />
+      <created>1743614447392</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1743614447392</updated>
+      <workItem from="1743614448625" duration="96000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>

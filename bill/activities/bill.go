@@ -1,54 +1,65 @@
-package activities 
+package activities
 
 import (
 	"context"
-	"pave-alex/bill"
-	"time"
-	"database/sql"
+	"encore-app/bill/database"
+	"encore-app/bill/models"
+	"fmt"
 )
 
-type BillDB struct {
-	DB *sql.DB
+func CreateBill(ctx context.Context, bill models.Bill) (*models.Bill, error) {
+	const query = `
+		INSERT INTO bills (id, currency, status, total_amount, created_at, closed_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING created_at
+	`
+	err := database.BillDB.QueryRow(ctx, query, bill.ID, bill.Currency, bill.Status, bill.TotalAmount, bill.CreatedAt, bill.ClosedAt).Scan(&bill.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &bill, nil
 }
 
-func NewBillDB(db *sql.DB) *BillDB {
-	return &BillDB{DB: db}
-}
-
-// Idempotent - we don't care if it's the first or 5th time, we just want to reflect the state in the DB
-func (billDb *BillDB)PersistBill(ctx context.Context, b bill.Bill, db *sql.DB,) error {
-	_, err := billDb.DB.Exec(ctx, `
-			INSERT INTO bills (id, currency, status, total_amount, created_at, closed_at)
-			VALUES ($1, $2, $3, $4, $5, $6)
-			ON CONFLICT (id) DO UPDATE
-			SET currency = EXCLUDED.currency,
-					status = EXCLUDED.status,
-					total_amount = EXCLUDED.total_amount,
-					closed_at = EXCLUDED.closed_at
-	`, b.ID, b.Currency, b.Status, b.TotalAmount, b.CreatedAt, nullTime(b.ClosedAt))
-	return err
-}
-
-func GetBillByID(ctx context.Context, id string, db *sql.DB) (bill.Bill, error) {
-	var b bill.Bill 
-	err := db.QueryRow(ctx, `
+func GetBillByID(ctx context.Context, id string) (*models.Bill, error) {
+	var bill models.Bill
+	err := database.BillDB.QueryRow(ctx, `
 	SELECT id, currency, status, total_amount, created_at, closed_at
 	FROM bills 
 	wHERE id = $1
 	`, id).Scan(
-		&b.ID,
-		&b.Currency,
-		&b.Status,
-		&b.TotalAmount,
-		&b.CreatedAt, 
-		&b.ClosedAt,
+		&bill.ID,
+		&bill.Currency,
+		&bill.Status,
+		&bill.TotalAmount,
+		&bill.CreatedAt,
+		&bill.ClosedAt,
 	)
-	return b, err
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch bill: %w", err)
+	}
+	return &bill, nil
 }
 
-func nullTime(t time.Time) *time.Time {
-	if t.IsZero() {
-			return nil
+func CloseBill(ctx context.Context, id string) (*models.Bill, error) {
+	query := `
+		UPDATE bills
+		SET status = 'closed',
+		    closed_at = CURRENT_TIMESTAMP
+		WHERE id = $1
+		RETURNING id, currency, status, total_amount, created_at, closed_at;
+	`
+
+	var bill models.Bill
+	err := database.BillDB.QueryRow(ctx, query, id).Scan(
+		&bill.ID,
+		&bill.Currency,
+		&bill.Status,
+		&bill.TotalAmount,
+		&bill.CreatedAt,
+		&bill.ClosedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to close bill: %w", err)
 	}
-	return &t
+	return &bill, nil
 }

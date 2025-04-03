@@ -25,12 +25,14 @@ curl -X POST http://localhost:4000/bills \
 Add Line Item
 
 ```
-curl -X POST http://localhost:4000/bills/:billId/items \
+curl -X POST http://localhost:4000/bills/<billId>/items \
   -H "Content-Type: application/json" \
   -d '{
-    "description": "Consultation Fee",
-    "amount": 120.50
+    "idempotencyKey": "<uniqueString>"
+    "description": "Steak",
+    "amount": 150,
   }'
+
 ```
 
 Close a Bill
