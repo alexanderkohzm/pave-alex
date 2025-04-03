@@ -1,3 +1,23 @@
+## Money Money Money... it's a rich man's world
+
+### Definitely can't use floats
+
+https://stackoverflow.com/questions/3730019/why-not-use-double-or-float-to-represent-currency/3730040#3730040
+
+### So... BigInt? Integer? Decimal?
+
+Integer/Int - 4 bytes (2.1 billion range) (2^31- 1)
+BIGINT - 8 bytes (9.2 quintillion range) (2^63 -1)
+
+Decimal - arbitrary precision numbers (this basically just means numbers can be stored with exact decimal representation)
+
+- Stored as variable-length binary format
+- Performance - slower than integers
+- When you MUST store fractional values directly
+
+Floats = base2 = can't represent decimals precisely
+Think of Decimal as a string of base-10 digits (string-like)
+
 ## Workflow and Lifecycle of Bill
 
 ### When first creating a bill, should we save (persist) the bill before or after the workflow is started?
@@ -95,6 +115,8 @@ The key here is:
 - Is idempotency wanting the exact same content? (B)
 
 ### What are some strategies for idempotency keys?
+
+NOTE: Our idempotency key is our UUID. We are making the assumption that each call from the frontend is unique and valid (i.e., not duplicating). There are strategies to prevent the frontend from sending repeated requests (e.g. a middleware layer to check and see if the frontend has sent an idempotency key we have seen before)
 
 So it really depends on what the intent is and how it fits business needs.
 

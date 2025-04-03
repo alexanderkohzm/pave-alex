@@ -13,7 +13,10 @@ CREATE TABLE line_items (
     id VARCHAR(36) PRIMARY KEY,
     bill_id VARCHAR(36) NOT NULL,
     description TEXT NOT NULL,
-    amount DECIMAL(19,4) NOT NULL,
+    amount BIGINT NOT NULL,
+    original_amount BIGINT NOT NULL,
+    exchange_rate DECIMAL(19,4) NOT NULL,
+    currency VARCHAR(3) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (bill_id) REFERENCES bills(id) ON DELETE CASCADE
 );

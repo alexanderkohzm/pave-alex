@@ -29,10 +29,9 @@ func (s *Service) Start(ctx context.Context) error {
 	w := worker.New(temporalClient.Client, "bill-task-queue", worker.Options{})
 
 	w.RegisterWorkflow(workflow.BillWorkflow)
-	w.RegisterActivity(activities.CreateBill)
+	w.RegisterActivity(activities.SaveBill)
 	w.RegisterActivity(activities.GetBillByID)
-	w.RegisterActivity(activities.UpsertLineItem)
-	w.RegisterActivity(activities.CloseBill)
+	w.RegisterActivity(activities.SaveLineItem)
 	// activity to close bill
 
 	err := w.Start()

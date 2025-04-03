@@ -19,7 +19,7 @@ import (
 //encore:api public method=POST path=/bills
 func CreateBill(ctx context.Context, req *models.CreateBillRequest) (*models.BillResponse, error) {
 
-	if req.Currency != "USD" && req.Currency != "GEL" {
+	if !req.Currency.Validate() {
 		return nil, fmt.Errorf("create Bill - invalid currency, must be either USD or GEL")
 	}
 
@@ -38,10 +38,10 @@ func CreateBill(ctx context.Context, req *models.CreateBillRequest) (*models.Bil
 	}
 
 	return &models.BillResponse{
-		ID:       billID,
-		Currency: req.Currency,
-		Status:   "OPEN",
-		Items:    []models.LineItem{},
+		ID:        billID,
+		Currency:  req.Currency,
+		Status:    "OPEN",
+		LineItems: []models.LineItem{},
 	}, nil
 }
 
@@ -52,12 +52,17 @@ func AddLineItem(ctx context.Context, billID string, req *models.AddLineItemRequ
 
 	workflowID := "bill-" + billID
 
+	convertedMoney, err := models.NewMoney(req.Amount, req.Currency)
+	if err != nil {
+		return nil, fmt.Errorf("AddLineItem - failed to convert amount to money: %w", err)
+	}
+
 	item := models.LineItem{
 		ID:             uuid.New().String(),
 		Description:    req.Description,
-		Amount:         req.Amount,
+		OriginalAmount: convertedMoney.Amount,
 		BillID:         billID,
-		IdempotencyKey: req.IdempotencyKey,
+		Currency:       req.Currency,
 	}
 
 	updateHandle, err := temporalClient.Client.UpdateWorkflow(ctx, client.UpdateWorkflowOptions{
@@ -115,7 +120,7 @@ func GetBill(ctx context.Context, billID string) (*models.BillResponse, error) {
 	err := database.BillDB.QueryRow(ctx, `
 	SELECT id, currency, status, total_amount, created_at, closed_at
 	FROM bills 
-	wHERE id = $1
+	WHERE id = $1
 	`, billID).Scan(
 		&bill.ID,
 		&bill.Currency,
@@ -135,8 +140,8 @@ func convertToResponse(b models.Bill) *models.BillResponse {
 	return &models.BillResponse{
 		ID:          b.ID,
 		Currency:    b.Currency,
-		Status:      b.Status,
+		Status:      models.BillStatus(b.Status),
 		TotalAmount: b.TotalAmount,
-		Items:       b.Items,
+		LineItems:   b.LineItems,
 	}
 }
