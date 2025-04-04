@@ -48,6 +48,8 @@ func BillWorkflow(ctx workflow.Context, billID string, currency models.Currency)
 		// ad-hoc currency conversions
 		// TODO: call FOREX API, use another activity
 		// For now, just use a map
+		item.ExchangeRate = decimal.NewFromInt(1)
+		item.Amount = item.OriginalAmount
 		if item.Currency != bill.Currency {
 			rate, exists := models.ExchangeRates[string(item.Currency)][string(bill.Currency)]
 			if !exists {
@@ -63,9 +65,6 @@ func BillWorkflow(ctx workflow.Context, billID string, currency models.Currency)
 			}
 			item.Amount = convertedMoney.Amount
 			item.ExchangeRate = decimal.NewFromFloat(rate)
-		} else {
-			item.Amount = item.OriginalAmount
-			item.ExchangeRate = decimal.NewFromInt(1)
 		}
 
 		bill.LineItems = append(bill.LineItems, item)
@@ -134,7 +133,7 @@ func BillWorkflow(ctx workflow.Context, billID string, currency models.Currency)
 	})
 
 	err = workflow.Await(ctx, func() bool {
-		return isClosed
+		return workflow.AllHandlersFinished(ctx) && isClosed
 	})
 	if err != nil {
 		return err

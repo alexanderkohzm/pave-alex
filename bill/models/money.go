@@ -93,11 +93,11 @@ func (m *Money) Convert(rate float64, targetCurrency Currency) (*Money, error) {
 	}
 
 	// Convert Amount (int64) to decimal in units
-	// print m amount
 	units := decimal.NewFromInt(m.Amount).Div(decimal.NewFromInt(int64Pow(10, int32(sourceDecimalPlaces))))
 	// Apply exchange rate
-	rateDecimal := decimal.NewFromFloat(rate)
+	// need to convert int to decimal to perform multiplication
 	// Shopspring requires int32
+	rateDecimal := decimal.NewFromFloat(rate)
 	convertedUnits := units.Mul(rateDecimal).Round(int32(targetDecimalPlaces))
 	// Convert back to smallest unit for target currency
 	multiplier := decimal.NewFromInt(int64Pow(10, int32(targetDecimalPlaces)))
