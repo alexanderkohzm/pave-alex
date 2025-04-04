@@ -278,8 +278,6 @@ Decimals Cons
 - How do we know how many decimal places to store up to?
 - Technically slower than integers
 
-### Currency Handling
-
 # Appendix
 
 This section includes any notes and questions that I thought of and tried to answer as I was writing this coding test.
