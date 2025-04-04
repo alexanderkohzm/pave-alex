@@ -141,14 +141,14 @@ curl http://localhost:4000/bills/:billId
 
 ### Bills Table
 
-| Column       | Type          | Description                                 |
-| ------------ | ------------- | ------------------------------------------- |
-| id           | VARCHAR(36)   | Primary key, unique identifier for the bill |
-| currency     | VARCHAR(3)    | Currency code (USD or GEL)                  |
-| status       | VARCHAR(20)   | Bill status (OPEN/CLOSED)                   |
-| total_amount | DECIMAL(19,4) | Total amount of the bill                    |
-| created_at   | TIMESTAMP     | When the bill was created                   |
-| closed_at    | TIMESTAMP     | When the bill was closed (nullable)         |
+| Column       | Type        | Description                                 |
+| ------------ | ----------- | ------------------------------------------- |
+| id           | VARCHAR(36) | Primary key, unique identifier for the bill |
+| currency     | VARCHAR(3)  | Currency code (USD or GEL)                  |
+| status       | VARCHAR(20) | Bill status (OPEN/CLOSED)                   |
+| total_amount | BIGINT      | Total amount of the bill                    |
+| created_at   | TIMESTAMP   | When the bill was created                   |
+| closed_at    | TIMESTAMP   | When the bill was closed (nullable)         |
 
 ### Line Items Table
 
