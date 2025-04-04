@@ -82,7 +82,7 @@ curl -X POST http://localhost:4000/bills/:billId/items \
       "CreatedAt": "0001-01-01T00:00:00Z"
     },
     {
-      "ID": "<UNIQUE_ID>",
+      "ID": "<UNIQUE_ID>", // Previously added line item
       "BillID": "<UNIQUE_ID>",
       "Description": "Consultation Fee",
       "Amount": 4366,
